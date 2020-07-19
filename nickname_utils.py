@@ -4,6 +4,7 @@ import json
 
 load_dotenv()
 filename = os.getenv('NICKFILEPATH')
+#TODO - make sure no 2 people have the same nicknames....
 
 def loadnicks():
     return json.loads(open(filename,"r").read())

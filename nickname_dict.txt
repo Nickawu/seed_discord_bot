@@ -1,1 +1,1 @@
-{"Owenry Magruder": ["NotFred310", "owen", "notfred"], "H0pe": ["Armo", "Xilent"], "Shaay": ["Adena", "Fussi"], "Erinbella10": ["maybealt"]}
+{"Owenry Magruder": ["NotFred310", "owen", "notfred"], "H0pe": ["Armo", "Xilent"], "Erinbella10": ["erin"], "Shaay": ["Adena"]}

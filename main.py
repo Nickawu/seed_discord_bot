@@ -12,6 +12,8 @@ SERVERTOK = os.getenv('SERVER_ID')
 
 nicks = nickname_utils.loadnicks()
 print(nicks)
+
+# print(seedbot_utils.nicknamelookup(nicks, "fsadfd"))
 #we could update sheets from the dict file, the main col with names could be dict keys... (only when we add main though)
 # client = discord.Client()
 
@@ -29,12 +31,36 @@ async def on_ready():
 @bot.command(name='setmain', help='Sets your main\'s name')
 async def setmainname(ctx, mainname):
     if nickname_utils.addmaintonick(nicks,mainname):
-        sender = "successfully added %s as a main name!" % mainname
-        await ctx.send(sender)
-        await ctx.send(nickname_utils.getnicks(nicks,mainname))
+        await ctx.send("successfully added %s as a main name!" % mainname)
+        await ctx.message.author.edit(nick=mainname)
     else:
-        await ctx.send("failed to add %s as a main name, are you sure it wasn't added already?")
+        await ctx.send("failed to add %s as a main name, are you sure it wasn't added already?" % mainname)
 
+@bot.command(name='addnickname', help='Adds a nickname to help identify you in posts')
+async def addnickname(ctx, nickname):
+    if nickname_utils.addnick(nicks, ctx.message.author.display_name, nickname):
+        await ctx.send("successfully added nickname %s for main %s" % (nickname, ctx.message.author.display_name))
+        await ctx.send("your nicknames: %s" % nickname_utils.getnicks(nicks, ctx.message.author.display_name))
+    else:
+        await ctx.send("failed to add nickname %s, did you setmain?" % nickname)
+
+@bot.command(name='removenickname', help='Removes a nickname if it exists for your main name')
+async def removenickname(ctx, nickname):
+    if nickname_utils.removenick(nicks, ctx.message.author.display_name, nickname):
+        await ctx.send("successfully removed nickname %s for main %s" % (nickname, ctx.message.author.display_name))
+        await ctx.send("your nicknames: %s" % nickname_utils.getnicks(nicks,ctx.message.author.display_name))
+    else:
+        await ctx.send("failed to remove nickname %s for main %s, does main exist? does the nickname exist currently?" % (nickname, ctx.message.author.display_name))
+        await ctx.send("current nicknames for main %s: %s" % (ctx.message.author.display_name, nickname_utils.getnicks(nicks,ctx.message.author.display_name)))
+
+@bot.command(name='getnicknames',help='Get a list of all the nicknames registered to someones main')
+async def getnickname(ctx, mainname):
+    await ctx.send("nicknames registered to main %s: %s" % (mainname, nickname_utils.getnicks(nicks,mainname)))
+
+@bot.command(name='edlattend', help='Add names to edl attend, format "level/star insert,names,here,comma,seperated')
+async def edlattend(ctx):
+    seedbot_utils.add_edl_points(nicks, ctx.message.content) #do we need await?
+    #maybe print the amount of kills each person has now...
 
 bot.run(TOKEN)
 
