@@ -28,7 +28,7 @@ async def on_ready():
     print(f'{bot.user.name} is connected to the following guild:\n'f'{server.name}(id: {server.id})')
     # await bot.logout()
 
-@bot.command(name='setmain', help='Sets your main\'s name')
+@bot.command(name='setmain', help='<main-name>')
 async def setmainname(ctx, mainname):
     if nickname_utils.addmaintonick(nicks,mainname):
         await ctx.send("successfully added %s as a main name!" % mainname)
@@ -36,15 +36,15 @@ async def setmainname(ctx, mainname):
     else:
         await ctx.send("failed to add %s as a main name, are you sure it wasn't added already?" % mainname)
 
-@bot.command(name='addnickname', help='Adds a nickname to help identify you in posts')
+@bot.command(name='addnickname', help='<nickname-to-add>')
 async def addnickname(ctx, nickname):
     if nickname_utils.addnick(nicks, ctx.message.author.display_name, nickname):
         await ctx.send("successfully added nickname %s for main %s" % (nickname, ctx.message.author.display_name))
         await ctx.send("your nicknames: %s" % nickname_utils.getnicks(nicks, ctx.message.author.display_name))
     else:
-        await ctx.send("failed to add nickname %s, did you setmain?" % nickname)
+        await ctx.send("failed to add nickname %s, did you setmain? is your nickname the same as someone else's?" % nickname)
 
-@bot.command(name='removenickname', help='Removes a nickname if it exists for your main name')
+@bot.command(name='removenickname', help='<nickname-to-remove>')
 async def removenickname(ctx, nickname):
     if nickname_utils.removenick(nicks, ctx.message.author.display_name, nickname):
         await ctx.send("successfully removed nickname %s for main %s" % (nickname, ctx.message.author.display_name))
@@ -53,14 +53,33 @@ async def removenickname(ctx, nickname):
         await ctx.send("failed to remove nickname %s for main %s, does main exist? does the nickname exist currently?" % (nickname, ctx.message.author.display_name))
         await ctx.send("current nicknames for main %s: %s" % (ctx.message.author.display_name, nickname_utils.getnicks(nicks,ctx.message.author.display_name)))
 
-@bot.command(name='getnicknames',help='Get a list of all the nicknames registered to someones main')
+@bot.command(name='getnicknames',help='<someones-main-name>')
 async def getnickname(ctx, mainname):
-    await ctx.send("nicknames registered to main %s: %s" % (mainname, nickname_utils.getnicks(nicks,mainname)))
+    msg = ctx.message.content
+    msg = msg[14:]
+    await ctx.send("nicknames registered to main %s: %s" % (msg, nickname_utils.getnicks(nicks,msg)))
 
-@bot.command(name='edlattend', help='Add names to edl attend, format "level/star insert,names,here,comma,seperated')
-async def edlattend(ctx):
-    seedbot_utils.add_edl_points(nicks, ctx.message.content) #do we need await?
-    #maybe print the amount of kills each person has now...
+@bot.command(name='attend', help='<level/star or raid name> <people>')
+async def attends(ctx):
+    added = seedbot_utils.add_points(nicks, ctx.message.content) #do we need await?
+    if added == False:
+        await ctx.send("did you enter the level/star or raid name correctly? I don't think so...")
+    else:
+        if len(added) == 0:
+            await ctx.send("success!")
+        else:
+            await ctx.send("ERROR: did not add points for the following --> %s" % added)
+            await ctx.send("did you spell their nickname right? does it exist?")
+        #maybe print the amount of kills each person has now...
+
+@bot.command(name='getmypoints', help='**no args to put in**')
+async def mypoints(ctx):
+    ret = seedbot_utils.getallpoints(ctx.message.author.display_name)
+    if ret == False:
+        await ctx.send("ERROR: your main's name not found in spreadsheet... did you register?")
+    else:
+        await ctx.send(ret)
+
 
 bot.run(TOKEN)
 

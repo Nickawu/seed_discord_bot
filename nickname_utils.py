@@ -17,6 +17,9 @@ def addnick(namedict, mainname, nick):
     #returns false if the mainname is NOT in the nickname file(aka spelled wrong or we need to add mainname...)
     if mainname not in namedict.keys():
         return False
+    for k in namedict.keys():
+        if nick in namedict[k]:
+            return False
     namedict[mainname].append(nick)
     writenicks(namedict)
     return True
@@ -24,7 +27,7 @@ def addnick(namedict, mainname, nick):
 def addmaintonick(namedict, mainname): #call this to add mainname to nickname dict, and then do addnick to add in nickname
     if mainname in namedict.keys():
         return False #we cant overrwite an existing mainname list...
-    namedict[mainname] = []
+    namedict[mainname] = [mainname] #incase we want to just type someones main name as their nickname
     writenicks(namedict)
     return True
 

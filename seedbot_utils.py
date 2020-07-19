@@ -9,26 +9,34 @@ from google.auth.transport.requests import Request
 from dotenv import load_dotenv
 #https://developers.google.com/sheets/api/quickstart/python?authuser=2
 
-slots = { # we can just hardcode the row corresponding to each level/size eg. 180/4 is mapped to row B forever anyways, why suffer?
-    '180/4' : 'B',
-    '180/5' : 'C',
-    '180/6' : 'D',
-    '195/4' : 'E',
-    '195/5' : 'F',
-    '195/6' : 'G',
-    '205/4' : 'H',
-    '205/5' : 'I',
-    '205/6' : 'J',
-    '210/4' : 'K',
-    '210/5' : 'L',
-    '210/6' : 'M',
-    '215/4' : 'N',
-    '215/5' : 'O',
-    '215/6' : 'P',
+slots = { # we can just hardcode the col corresponding to each level/size eg. 180/4 is mapped to row B forever anyways, why suffer?
+    #we can reference the col by offset int rather than letter, easier list indexing later on...
+    #if we need more space later on, we can collapse 180/4,180/5,180/6 to 180 and just map all of them is this dict to the same col value
+    '180/4' : 1,
+    '180/5' : 2,
+    '180/6' : 3,
+    '195/4' : 4,
+    '195/5' : 5,
+    '195/6' : 6,
+    '205/4' : 7,
+    '205/5' : 8,
+    '205/6' : 9,
+    '210/4' : 10,
+    '210/5' : 11,
+    '210/6' : 12,
+    '215/4' : 13,
+    '215/5' : 14,
+    '215/6' : 15,
+    'hrung' : 16,
+    'mordy' : 17,
+    'necro' : 18,
+    'gele' : 19,
+    'bt' : 20,
+    'dino' : 21
 }
 
 
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 load_dotenv()
 SHEET_ID = os.getenv('SPREADSHEET_ID')
@@ -55,15 +63,17 @@ service = build('sheets', 'v4', credentials=creds)
 sheet = service.spreadsheets()
 
 dynamic_range = sheet.values().get(spreadsheetId=SHEET_ID, range='Z2').execute()
-# print(dynamic_range['values'][0][0])
 dynamic_range = dynamic_range['values'][0][0]
 nameslist = sheet.values().get(spreadsheetId=SHEET_ID, range=dynamic_range).execute().get('values',[])
 flatnames = [x[0] for x in nameslist] #flatnames is just an in order list of names in the order they appear in the sheet (index + 1) is the sheet row to write to
-# print(flatnames)
-# values = nameslist.get('values',[])
 
-# for row in nameslist:
-#     print(row)
+# range_names = []
+# for x in range(2,5):
+#     range_names.append("%d:%d" % (x,x))
+
+# print(range_names)
+# print(sheet.values().get(spreadsheetId=SHEET_ID, range=range_names).execute().get('valueRanges',[]))
+
 
 def nicknamelookup(nickdict, possiblename):
     for mainname in nickdict.keys():
@@ -72,24 +82,61 @@ def nicknamelookup(nickdict, possiblename):
                 return mainname
     return None
 
-def add_edl_points(nickdict, msgcontent): # we can parse on space assuming everyone registers a 1 word nickname
+def add_points(nickdict, msgcontent): # we can parse on space assuming everyone registers a 1 word nickname
     #first order of buisness... parse message (ex. "!edlattend 195/4 owen fred adena erin")
-    print(msgcontent)
+    # print(msgcontent)
     brokenmsg = msgcontent.split(' ')
     colname = brokenmsg[1]
     namestoadd = brokenmsg[2:]
+    rets = namestoadd.copy()
     sheetnames = []
     for n in namestoadd:
         tmp = nicknamelookup(nickdict,n)
         if tmp != None:
             sheetnames.append(tmp)
-    
+            rets.remove(n)
+        else:
+            print("ERRORLOG: '%s' not found in nickname lookup" % n)
+    sheetnames = list(set(sheetnames)) #protect against dups...
     for name in sheetnames:
         if name in flatnames:
-            print(name)
+            addrow = flatnames.index(name)
+            addrow += 2 #0th element of the list is the second row in the spreadsheet...
+            if colname.lower() not in slots.keys():
+                return False
+            rangemacro = "A%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+            changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
+            changer[0][slots[colname.lower()]] = str(int(changer[0][slots[colname.lower()]]) + 1)
+            body = {'values' : changer}
+            logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
+            print('SHEET_UPDATE: {0} cells updated'.format(logger.get('updatedCells')))
+        else:
+            print("ERRORLOG: name %s not found in flatnames list... (invalid main name, or main name not added to sheet)" % name)
 
+    return rets
 
-    # print(brokenmsg)
-    # print(colname)
-    # print(namestoadd)
-    return True 
+def getallpoints(mainname): #returns all raid points and edl total
+    if mainname not in flatnames:
+        return False
+    retdict = {}
+    addrow = flatnames.index(mainname)
+    addrow += 2 #0th element of the list is the second row in the spreadsheet...
+    rangemacro = "Q%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+    vals = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])[0]
+    retdict['hrung --> '] = vals[0]
+    retdict['mordy --> '] = vals[1]
+    retdict['necro --> '] = vals[2]
+    retdict['gele --> '] = vals[3]
+    retdict['bt --> '] = vals[4]
+    retdict['dino --> '] = vals[5]
+    rangemacro = "X%d:X%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+    vals = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])[0]
+    retdict['EDL_TOTAL --> '] = vals[0]
+    
+    rstring = ""
+    for h in retdict.keys():
+        rstring += h
+        rstring += retdict[h]
+        rstring += '\n'
+
+    return rstring
