@@ -1,4 +1,3 @@
-# seed_discord_bot
 # Discord API interaction with a Google Sheets backend to track stats
 
 tutorial pulled from: https://realpython.com/how-to-make-a-discord-bot-python/
