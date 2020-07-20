@@ -109,11 +109,29 @@ def add_points(nickdict, msgcontent): # we can parse on space assuming everyone 
             changer[0][slots[colname.lower()]] = str(int(changer[0][slots[colname.lower()]]) + 1)
             body = {'values' : changer}
             logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
-            print('SHEET_UPDATE: {0} cells updated'.format(logger.get('updatedCells')))
+            print('SHEET_UPDATE_PLUS: {0} cells updated'.format(logger.get('updatedCells')))
         else:
             print("ERRORLOG: name %s not found in flatnames list... (invalid main name, or main name not added to sheet)" % name)
 
     return rets
+
+def remove_points(mainname, id):
+    if mainname not in flatnames:
+        return False
+    if id not in slots.keys():
+        return False
+    addrow = flatnames.index(mainname)
+    addrow += 2 #0th element of the list is the second row in the spreadsheet...
+    rangemacro = "A%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+    changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
+    if int(changer[0][slots[id.lower()]]) == 0: #cant have negative points....
+        return False
+    changer[0][slots[id.lower()]] = str(int(changer[0][slots[id.lower()]]) - 1)
+    body = {'values' : changer}
+    logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
+    print('SHEET_UPDATE_MINUS: {0} cells updated'.format(logger.get('updatedCells')))
+    
+
 
 def getallpoints(mainname): #returns all raid points and edl total
     if mainname not in flatnames:
