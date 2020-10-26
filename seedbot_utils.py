@@ -9,30 +9,47 @@ from google.auth.transport.requests import Request
 from dotenv import load_dotenv
 #https://developers.google.com/sheets/api/quickstart/python?authuser=2
 
-slots = { # we can just hardcode the col corresponding to each level/size eg. 180/4 is mapped to row B forever anyways, why suffer?
+dlslots = { # we can just hardcode the col corresponding to each level/size eg. 180/4 is mapped to row B forever anyways, why suffer?
     #we can reference the col by offset int rather than letter, easier list indexing later on...
     #if we need more space later on, we can collapse 180/4,180/5,180/6 to 180 and just map all of them is this dict to the same col value
-    '180/4' : 1,
-    '180/5' : 2,
-    '180/6' : 3,
-    '195/4' : 4,
-    '195/5' : 5,
-    '195/6' : 6,
-    '205/4' : 7,
-    '205/5' : 8,
-    '205/6' : 9,
-    '210/4' : 10,
-    '210/5' : 11,
-    '210/6' : 12,
-    '215/4' : 13,
-    '215/5' : 14,
-    '215/6' : 15,
-    'hrung' : 16,
-    'mordy' : 17,
-    'necro' : 18,
-    'gele' : 19,
-    'bt' : 20,
-    'dino' : 21
+    'king/5' : 1,
+    'king/6' : 2,
+    'bolg/5' : 3,
+    'bolg/6' : 4,
+    'snorri/5' : 5,
+    'snorri/6' : 6
+}
+
+edlslots = {
+    '195/5' : 1,
+    '195/6' : 2,
+    '200/5' : 3,
+    '200/6' : 4,
+    '205/5' : 5,
+    '205/6' : 6,
+    '210/5' : 7,
+    '210/6' : 8,
+    '215/5' : 9,
+    '215/6' : 10
+}
+
+raidslots = {
+    'hrung' : 1,
+    'mordy' : 2,
+    'necro' : 3,
+    'protbase' : 4,
+    'protprime' : 5,
+    'gele' : 6,
+    'bt' : 7,
+    'dino' : 8
+}
+
+otherslots = {
+    'legacy/5' : 1,
+    'legacy/6' : 2,
+    'heliant/5' : 3,
+    'heliant/6' : 4,
+    'factions' : 5
 }
 
 
@@ -74,6 +91,16 @@ flatnames = [x[0] for x in nameslist] #flatnames is just an in order list of nam
 # print(range_names)
 # print(sheet.values().get(spreadsheetId=SHEET_ID, range=range_names).execute().get('valueRanges',[]))
 
+def getgid(bossname):
+    if bossname in list(dlslots.keys()):
+        return ("'dl'!", dlslots[bossname])
+    if bossname in list(edlslots.keys()):
+        return ("'edl'!", edlslots[bossname])
+    if bossname in list(raidslots.keys()):
+        return ("'raids'!", raidslots[bossname])
+    if bossname in list(otherslots.keys()):
+        return ("'others'!", otherslots[bossname])
+    return None
 
 def nicknamelookup(nickdict, possiblename):
     for mainname in nickdict.keys():
@@ -102,11 +129,13 @@ def add_points(nickdict, msgcontent): # we can parse on space assuming everyone 
         if name in flatnames:
             addrow = flatnames.index(name)
             addrow += 2 #0th element of the list is the second row in the spreadsheet...
-            if colname.lower() not in slots.keys():
+            gidtuple= getgid(colname.lower())
+            if gidtuple == None:
                 return False
             rangemacro = "A%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+            rangemacro = gidtuple[0] + rangemacro
             changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
-            changer[0][slots[colname.lower()]] = str(int(changer[0][slots[colname.lower()]]) + 1)
+            changer[0][gidtuple[1]] = str(int(changer[0][gidtuple[1]]) + 1)
             body = {'values' : changer}
             logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
             print('SHEET_UPDATE_PLUS: {0} cells updated'.format(logger.get('updatedCells')))
@@ -118,15 +147,17 @@ def add_points(nickdict, msgcontent): # we can parse on space assuming everyone 
 def remove_points(mainname, id):
     if mainname not in flatnames:
         return False
-    if id not in slots.keys():
+    gidtuple= getgid(id)
+    if gidtuple == None:
         return False
     addrow = flatnames.index(mainname)
     addrow += 2 #0th element of the list is the second row in the spreadsheet...
     rangemacro = "A%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+    rangemacro = gidtuple[0] + rangemacro
     changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
-    if int(changer[0][slots[id.lower()]]) == 0: #cant have negative points....
+    if int(changer[0][gidtuple[1]]) == 0: #cant have negative points....
         return False
-    changer[0][slots[id.lower()]] = str(int(changer[0][slots[id.lower()]]) - 1)
+    changer[0][gidtuple[1]] = str(int(changer[0][gidtuple[1]]) - 1)
     body = {'values' : changer}
     logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
     print('SHEET_UPDATE_MINUS: {0} cells updated'.format(logger.get('updatedCells')))
@@ -139,7 +170,11 @@ def getallpoints(mainname): #returns all raid points and edl total
     retdict = {}
     addrow = flatnames.index(mainname)
     addrow += 2 #0th element of the list is the second row in the spreadsheet...
-    rangemacro = "Q%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+    points = 0
+    sheets = [("'dl'!",'H'),("'edl'!",'L'), ("'raids'!", 'J'), ("'others'!", 'G')] #HARDCODED TOTALNUM COLS FOR EACH SEP SHEET
+    for gidtup in sheets:
+        rangemacro = "Q%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
+    
     vals = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])[0]
     retdict['hrung --> '] = vals[0]
     retdict['mordy --> '] = vals[1]
