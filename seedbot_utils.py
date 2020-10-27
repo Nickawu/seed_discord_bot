@@ -52,6 +52,38 @@ otherslots = {
     'factions' : 5
 }
 
+conversions = {
+    'king/5' : 5,
+    'king/6' : 10,
+    'bolg/5' : 10,
+    'bolg/6' : 15,
+    'snorri/5' : 10,
+    'snorri/6' : 20,
+    '195/5' : 10,
+    '195/6' : 20,
+    '200/5' : 10,
+    '200/6' : 20,
+    '205/5' : 15,
+    '205/6' : 25,
+    '210/5' : 15,
+    '210/6' : 25,
+    '215/5' : 20,
+    '215/6' : 30,
+    'hrung' : 75,
+    'mordy' : 150,
+    'necro' : 225,
+    'protbase' : 200,
+    'protprime' : 300,
+    'gele' : 500,
+    'bt' : 750,
+    'dino' : 1000,
+    'legacy/5' : 25,
+    'legacy/6' : 75,
+    'heliant/5' : 10,
+    'heliant/6' : 50,
+    'factions' : 50
+}
+
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
@@ -91,15 +123,15 @@ flatnames = [x[0] for x in nameslist] #flatnames is just an in order list of nam
 # print(range_names)
 # print(sheet.values().get(spreadsheetId=SHEET_ID, range=range_names).execute().get('valueRanges',[]))
 
-def getgid(bossname):
+def getgid(bossname, addrow):
     if bossname in list(dlslots.keys()):
-        return ("'dl'!", dlslots[bossname])
+        return ("'dl'!A%d:G%d" % (addrow,addrow), dlslots[bossname])
     if bossname in list(edlslots.keys()):
-        return ("'edl'!", edlslots[bossname])
+        return ("'edl'!A%d:K%d"% (addrow,addrow), edlslots[bossname])
     if bossname in list(raidslots.keys()):
-        return ("'raids'!", raidslots[bossname])
+        return ("'raids'!A%d:I%d"% (addrow,addrow), raidslots[bossname])
     if bossname in list(otherslots.keys()):
-        return ("'others'!", otherslots[bossname])
+        return ("'others'!A%d:F%d"% (addrow,addrow), otherslots[bossname])
     return None
 
 def nicknamelookup(nickdict, possiblename):
@@ -129,35 +161,37 @@ def add_points(nickdict, msgcontent): # we can parse on space assuming everyone 
         if name in flatnames:
             addrow = flatnames.index(name)
             addrow += 2 #0th element of the list is the second row in the spreadsheet...
-            gidtuple= getgid(colname.lower())
+            gidtuple= getgid(colname.lower(),addrow)
             if gidtuple == None:
                 return False
-            rangemacro = "A%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
-            rangemacro = gidtuple[0] + rangemacro
-            changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
+            changer = sheet.values().get(spreadsheetId=SHEET_ID, range=gidtuple[0]).execute().get('values',[])
             changer[0][gidtuple[1]] = str(int(changer[0][gidtuple[1]]) + 1)
             body = {'values' : changer}
+            logger = sheet.values().update(spreadsheetId=SHEET_ID, range=gidtuple[0], valueInputOption="USER_ENTERED", body=body).execute()
+            print('SHEET_UPDATE_PLUS_ABSOLUTE: {0} cells updated'.format(logger.get('updatedCells')))
+
+            rangemacro = "'pointpool'!A%d:B%d" % (addrow,addrow)
+            changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
+            changer[0][1] = str(int(changer[0][1]) + conversions[colname.lower()])
+            body = {'values' : changer}
             logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
-            print('SHEET_UPDATE_PLUS: {0} cells updated'.format(logger.get('updatedCells')))
+            print('SHEET_UPDATE_PLUS_POOL: {0} cells updated'.format(logger.get('updatedCells')))
         else:
             print("ERRORLOG: name %s not found in flatnames list... (invalid main name, or main name not added to sheet)" % name)
 
     return rets
 
-def remove_points(mainname, id):
-    if mainname not in flatnames:
-        return False
-    gidtuple= getgid(id)
-    if gidtuple == None:
+def remove_points(ndict, name, pts):
+    mainname = nicknamelookup(ndict, name)
+    if mainname == None:
         return False
     addrow = flatnames.index(mainname)
     addrow += 2 #0th element of the list is the second row in the spreadsheet...
-    rangemacro = "A%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
-    rangemacro = gidtuple[0] + rangemacro
+    rangemacro = "'pointpool'!A%d:B%d" % (addrow,addrow)
     changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
-    if int(changer[0][gidtuple[1]]) == 0: #cant have negative points....
+    if int(changer[0][1]) - pts < 0: #cant have negative points....
         return False
-    changer[0][gidtuple[1]] = str(int(changer[0][gidtuple[1]]) - 1)
+    changer[0][1] = str(int(changer[0][1]) - pts)
     body = {'values' : changer}
     logger = sheet.values().update(spreadsheetId=SHEET_ID, range=rangemacro, valueInputOption="USER_ENTERED", body=body).execute()
     print('SHEET_UPDATE_MINUS: {0} cells updated'.format(logger.get('updatedCells')))
@@ -167,29 +201,10 @@ def remove_points(mainname, id):
 def getallpoints(mainname): #returns all raid points and edl total
     if mainname not in flatnames:
         return False
-    retdict = {}
     addrow = flatnames.index(mainname)
     addrow += 2 #0th element of the list is the second row in the spreadsheet...
-    points = 0
-    sheets = [("'dl'!",'H'),("'edl'!",'L'), ("'raids'!", 'J'), ("'others'!", 'G')] #HARDCODED TOTALNUM COLS FOR EACH SEP SHEET
-    for gidtup in sheets:
-        rangemacro = "Q%d:V%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
-    
-    vals = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])[0]
-    retdict['hrung --> '] = vals[0]
-    retdict['mordy --> '] = vals[1]
-    retdict['necro --> '] = vals[2]
-    retdict['gele --> '] = vals[3]
-    retdict['bt --> '] = vals[4]
-    retdict['dino --> '] = vals[5]
-    rangemacro = "X%d:X%d" % (addrow,addrow) #change v to new col name if we add more categories, or decrease v if we collapse
-    vals = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])[0]
-    retdict['EDL_TOTAL --> '] = vals[0]
-    
-    rstring = ""
-    for h in retdict.keys():
-        rstring += h
-        rstring += retdict[h]
-        rstring += '\n'
-
+    rangemacro = "'pointpool'!A%d:B%d" % (addrow,addrow)
+    changer = sheet.values().get(spreadsheetId=SHEET_ID, range=rangemacro).execute().get('values',[])
+    pts = changer[0][1]
+    rstring = mainname + " has " + pts + " points\n"
     return rstring

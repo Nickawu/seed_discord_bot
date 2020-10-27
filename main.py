@@ -75,11 +75,16 @@ async def attends(ctx):
             await ctx.send("did you spell their nickname right? does it exist?")
         #maybe print the amount of kills each person has now...
 
-@bot.command(name='removeattend', help='<level/star or raid name>')
+@bot.command(name='removepoints', help='<name-of-player> <amount-of-points-to-remove>')
 async def removeattends(ctx, ids):
-    retval = seedbot_utils.remove_points(ctx.message.author.display_name,ids)
+    #example command !removepoints owen 400
+    msg = ctx.message.content
+    msg = msg.split(' ')
+    remname = msg[1]
+    rempts = int(msg[2])
+    retval = seedbot_utils.remove_points(nicks,remname,rempts)
     if retval == False:
-        await ctx.send("did you setmain? do you have more than 0 points? did you do <level/star or raid name> right?")
+        await ctx.send("did you setmain? will you have more than 0 points after this (points cannot go negative)?")
     else:
         await ctx.send("success!")
 
